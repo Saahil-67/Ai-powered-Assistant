@@ -14,7 +14,7 @@ import {
 import { Loader2, Clock } from 'lucide-react';
 
 const DIFFICULTY_ORDER = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
-const DIFFICULTY_TIME = { easy: 20, medium: 60, hard: 120 };
+const DIFFICULTY_TIME: Record<string, number> = { easy: 20, medium: 60, hard: 120 };
 
 const ChatInterface: React.FC = () => {
   const dispatch = useDispatch();
@@ -22,7 +22,7 @@ const ChatInterface: React.FC = () => {
   const candidate = useSelector((state: RootState) => state.candidate);
   const [answer, setAnswerText] = useState('');
   const [timer, setTimer] = useState(DIFFICULTY_TIME[DIFFICULTY_ORDER[currentQuestion]]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   // Fetch question from backend
   useEffect(() => {
@@ -53,8 +53,8 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     if (questions[currentQuestion] && !loading && !completed) {
       if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setTimer(prev => {
+      timerRef.current = window.setInterval(() => {
+        setTimer((prev: number) => {
           if (prev <= 1) {
             handleSubmit();
             return 0;
