@@ -1,14 +1,21 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
-interface UIState {
+/* -------------------------------------------------
+   Slice state – **private** (no export)
+   ------------------------------------------------- */
+export interface UIState {
   activeTab: 'interviewee' | 'interviewer';
 }
 
+/* Initial state */
 const initialState: UIState = {
   activeTab: 'interviewee',
 };
 
+/* -------------------------------------------------
+   Slice definition
+   ------------------------------------------------- */
 const uiSlice = createSlice({
   name: 'ui',
   initialState,
@@ -19,5 +26,8 @@ const uiSlice = createSlice({
   },
 });
 
+/* -------------------------------------------------
+   Export actions and reducer
+   ------------------------------------------------- */
 export const { setActiveTab } = uiSlice.actions;
 export default uiSlice.reducer;

@@ -4,12 +4,12 @@ import ResumeUpload from '../components/ResumeUpload';
 import ChatInterface from '../components/ChatInterface';
 
 const IntervieweeView: React.FC = () => {
-  const [uploaded, setUploaded] = useState(false);
+  const [uploaded] = useState(false);
 
   return (
     <div className="w-full h-full flex items-center justify-center">
       {!uploaded ? (
-        <ResumeUpload onUpload={() => setUploaded(true)} />
+        <ResumeUpload />
       ) : (
         <ChatInterface />
       )}

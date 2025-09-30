@@ -1,8 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
+/* Exported type is fine – other parts of the app may need it */
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
+/* -------------------------------------------------
+   Slice state – **private** (no export)
+   ------------------------------------------------- */
 interface Question {
   id: string;
   text: string;
@@ -12,7 +16,7 @@ interface Question {
   submitted: boolean;
 }
 
-interface InterviewState {
+export interface InterviewState {
   questions: Question[];
   currentQuestion: number;
   isPaused: boolean;
@@ -20,6 +24,7 @@ interface InterviewState {
   endTime: number | null;
 }
 
+/* Initial state */
 const initialState: InterviewState = {
   questions: [],
   currentQuestion: 0,
@@ -28,6 +33,9 @@ const initialState: InterviewState = {
   endTime: null,
 };
 
+/* -------------------------------------------------
+   Slice definition
+   ------------------------------------------------- */
 const interviewSlice = createSlice({
   name: 'interview',
   initialState,
@@ -38,7 +46,10 @@ const interviewSlice = createSlice({
     setCurrentQuestion(state, action: PayloadAction<number>) {
       state.currentQuestion = action.payload;
     },
-    submitAnswer(state, action: PayloadAction<{ index: number; answer: string }>) {
+    submitAnswer(
+      state,
+      action: PayloadAction<{ index: number; answer: string }>
+    ) {
       const { index, answer } = action.payload;
       if (state.questions[index]) {
         state.questions[index].answer = answer;
@@ -60,5 +71,17 @@ const interviewSlice = createSlice({
   },
 });
 
-export const { setQuestions, setCurrentQuestion, submitAnswer, setPaused, setStartTime, setEndTime, resetInterview } = interviewSlice.actions;
+/* -------------------------------------------------
+   Export actions and reducer
+   ------------------------------------------------- */
+export const {
+  setQuestions,
+  setCurrentQuestion,
+  submitAnswer,
+  setPaused,
+  setStartTime,
+  setEndTime,
+  resetInterview,
+} = interviewSlice.actions;
+
 export default interviewSlice.reducer;

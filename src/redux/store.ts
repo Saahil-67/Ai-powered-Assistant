@@ -10,10 +10,11 @@ export const store = configureStore({
     candidate: candidateReducer,
     interview: interviewReducer,
     ui: uiReducer,
-  candidateHistory: candidateHistoryReducer,
-  auth: authReducer,
+    candidateHistory: candidateHistoryReducer,
+    auth: authReducer,
   },
 });
 
+/* Export only the inferred store types – no slice‑state types are re‑exported */
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

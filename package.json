@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run compile || true",
+    "build": "npm run compile",
     "compile": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "build:skip-ts": "NODE_ENV=production next build"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@radix-ui/react-tabs": "^1.1.13",

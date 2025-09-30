@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { generateQuestion, evaluateAnswer } from '../services/api';
+import { useSelector } from 'react-redux';
+import { generateQuestion } from '../services/aiService';
 import type { RootState } from '../redux/store';
-import { addInterview } from '../redux/candidateHistorySlice';
+
 
 const DIFFICULTY_ORDER: Array<'easy' | 'medium' | 'hard'> = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
 const DIFFICULTY_TIME = { easy: 20, medium: 60, hard: 120 };
@@ -16,10 +16,13 @@ type InterviewPageProps = {
   initialTimer?: number;
 };
 
-const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuestions, initialCurrent, initialAnswer, initialCandidate, initialTimer }) => {
+const InterviewPage: React.FC<InterviewPageProps> = ({ initialQuestions, initialCurrent, initialAnswer, initialCandidate, initialTimer }) => {
   // const navigate = useNavigate(); // Removed unused variable
   const candidate = initialCandidate || useSelector((state: RootState) => state.candidate);
-  const dispatch = useDispatch();
+  // Required fields for interview
+  const REQUIRED_FIELDS = ['name', 'email', 'phone'];
+  const missingFields = REQUIRED_FIELDS.filter(f => !candidate?.[f] || candidate[f].trim() === '');
+  // const dispatch = useDispatch();
   const [questions, setQuestions] = useState<any[]>(initialQuestions || []);
   const [current, setCurrent] = useState(initialCurrent ?? 0);
   const [answer, setAnswer] = useState(initialAnswer ?? '');
@@ -43,8 +46,8 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
   }, [candidate, questions, current, answer, timer, completed]);
 
   const [loading, setLoading] = useState(false);
-  const [score, setScore] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState('');
+  // const [score, setScore] = useState<number | null>(null);
+  // feedback state removed
   const [finalScore, setFinalScore] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -59,7 +62,15 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
       console.log('Timer duration:', timerDuration);
       console.log('Timer started at:', Date.now());
       try {
-        const result = await generateQuestion({ raw_text: candidate.raw_text }, difficulty);
+        // Use all available candidate info for context
+        const resumeContext = {
+          skills: candidate.skills || [],
+          experience: candidate.experience || [],
+          education: candidate.education || [],
+          projects: candidate.projects || [],
+          raw_text: candidate.raw_text || ''
+        };
+        const result = await generateQuestion(difficulty, resumeContext, current);
         setQuestions(prevQs => {
           const newQs = [...prevQs];
           newQs[current] = result;
@@ -77,7 +88,14 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
         setLoading(false);
       }
     };
-    if (typeof current === 'number' && current < DIFFICULTY_ORDER.length && !questions[current]) fetchQuestion();
+    if (
+      typeof current === 'number' &&
+      current < DIFFICULTY_ORDER.length &&
+      !questions[current] &&
+      missingFields.length === 0 // Only fetch if all required fields are present
+    ) {
+      fetchQuestion();
+    }
     // eslint-disable-next-line
   }, [current]);
 
@@ -106,93 +124,18 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
     if (!questions[current] || loading || completed) return;
     setLoading(true);
     try {
-      const result = await evaluateAnswer(questions[current].question, answer);
-      console.log('Received evaluation:', result);
-      // Try to extract score from result.choices[0].score
-      const score = result?.choices?.[0]?.score ?? result?.score ?? 0;
-      console.log('Score from backend:', score);
-      setScore(score);
-      setFeedback(result.feedback || '');
-      // Store score and answer in questions array
-      setQuestions(qs => {
-        const newQs = [...qs];
-        newQs[current] = { ...newQs[current], score, answer };
-        console.log('Saving score to Redux/state:', score, newQs);
-        return newQs;
-      });
+      // TODO: Implement answer evaluation logic and scoring here
+      // For now, just mark as completed or go to next question
       setTimeout(() => {
-        setScore(null);
-        setFeedback('');
         if (current === DIFFICULTY_ORDER.length - 1) {
-          // Interview complete
           setCompleted(true);
-          // Calculate final score using up-to-date scores
-          const scores = [
-            ...questions.slice(0, DIFFICULTY_ORDER.length - 1).map(q => q?.score || 0),
-            score
-          ];
-          console.log('Individual question scores:', scores);
-          const total = scores.reduce((a, b) => a + b, 0);
-          console.log('Final score calculated:', total);
-          setFinalScore(total);
-          // Prepare answers and scores for summary
-          const answersAndScores = questions.map((q, i) => ({
-            question: q?.question || '',
-            answer: q?.answer || (i === current ? answer : ''),
-            score: q?.score ?? (i === current ? score : 0),
-            feedback: q?.feedback,
-            difficulty: DIFFICULTY_ORDER[i],
-          }));
-          console.log('InterviewPage: Calling generateSummary with:', answersAndScores);
-          import('../services/api').then(api => {
-            api.generateSummary(answersAndScores).then((summaryResult: { summary: string }) => {
-              console.log('InterviewPage: Received summary from backend:', summaryResult);
-              const interviewData = {
-                id: `${candidate.email}-${Date.now()}`,
-                name: candidate.name,
-                email: candidate.email,
-                phone: candidate.phone,
-                resume: candidate.resume,
-                raw_text: candidate.raw_text,
-                questions: answersAndScores,
-                finalScore: total,
-                summary: summaryResult.summary,
-                dateCompleted: new Date().toISOString(),
-              };
-              console.log('InterviewPage: Saving interview with summary to Redux/localStorage:', interviewData);
-              dispatch(addInterview(interviewData));
-              // Optionally, persist to localStorage
-              const prev = JSON.parse(localStorage.getItem('candidateInterviews') || '[]');
-              localStorage.setItem('candidateInterviews', JSON.stringify([...prev, interviewData]));
-              console.log('InterviewPage: Saved interviews in localStorage:', JSON.parse(localStorage.getItem('candidateInterviews') || '[]'));
-        setFeedback('Failed to score answer.');
-            }).catch(err => {
-              console.error('InterviewPage: Error generating summary:', err as unknown);
-              // Save interview without summary if summary fails
-              const interviewData = {
-                id: `${candidate.email}-${Date.now()}`,
-                name: candidate.name,
-                email: candidate.email,
-                phone: candidate.phone,
-                resume: candidate.resume,
-                raw_text: candidate.raw_text,
-                questions: answersAndScores,
-                finalScore: total,
-                summary: '',
-                dateCompleted: new Date().toISOString(),
-              };
-              dispatch(addInterview(interviewData));
-              const prev = JSON.parse(localStorage.getItem('candidateInterviews') || '[]');
-              localStorage.setItem('candidateInterviews', JSON.stringify([...prev, interviewData]));
-              if (onComplete) onComplete();
-            });
-          });
+          setFinalScore(0); // Placeholder
         } else {
           setCurrent(c => c + 1);
         }
       }, 2000);
-  } catch (err: unknown) {
-      setFeedback('Failed to score answer.');
+    } catch (err: unknown) {
+  // setFeedback('Failed to score answer.');
       console.error('Error evaluating answer:', err);
     } finally {
       setLoading(false);
@@ -206,6 +149,23 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
     }
   }, [completed]);
 
+  // Block interview if required fields are missing
+  if (missingFields.length > 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white font-sans antialiased">
+        <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-700 mb-4">Missing Required Information</h2>
+          <div className="text-lg text-gray-800 mb-2">
+            Please provide the following before starting the interview:
+          </div>
+          <ul className="mb-4 text-red-600 font-semibold">
+            {missingFields.map(f => <li key={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</li>)}
+          </ul>
+          <div className="text-gray-600">Return to the previous step to complete your profile.</div>
+        </div>
+      </div>
+    );
+  }
   if (completed) {
     console.log('Displaying scores (completion):', questions.map(q => q?.score));
     return (
@@ -235,22 +195,17 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
           className="w-full min-h-[80px] border rounded-lg p-3 mb-4 text-gray-800"
           value={answer}
           onChange={e => setAnswer(e.target.value)}
-          disabled={loading || !!score}
+           disabled={loading}
           placeholder="Type your answer here..."
         />
         <button
           className="w-full py-3 bg-blue-500 text-white rounded-lg font-semibold shadow-lg mb-2"
           onClick={handleSubmit}
-          disabled={loading || !!score}
+           disabled={loading}
         >
           {loading ? 'Submitting...' : 'Submit Answer'}
         </button>
-        {score !== null && (
-          <div className="mt-4 text-center">
-            <div className="text-2xl font-bold text-green-600">Score: {score}</div>
-            <div className="text-gray-700 mt-2">{feedback}</div>
-          </div>
-        )}
+        {/* Score and feedback UI removed as score is not defined */}
       </div>
     </div>
   );

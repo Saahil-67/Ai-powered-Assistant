@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
-interface CandidateState {
+export interface CandidateState {
   name: string;
   email: string;
   phone: string;
