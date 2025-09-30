@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { generateQuestion, evaluateAnswer } from '../services/api';
 import type { RootState } from '../redux/store';
@@ -18,7 +17,7 @@ type InterviewPageProps = {
 };
 
 const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuestions, initialCurrent, initialAnswer, initialCandidate, initialTimer }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Removed unused variable
   const candidate = initialCandidate || useSelector((state: RootState) => state.candidate);
   const dispatch = useDispatch();
   const [questions, setQuestions] = useState<any[]>(initialQuestions || []);
@@ -146,7 +145,7 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
           }));
           console.log('InterviewPage: Calling generateSummary with:', answersAndScores);
           import('../services/api').then(api => {
-            api.generateSummary(answersAndScores).then(summaryResult => {
+            api.generateSummary(answersAndScores).then((summaryResult: { summary: string }) => {
               console.log('InterviewPage: Received summary from backend:', summaryResult);
               const interviewData = {
                 id: `${candidate.email}-${Date.now()}`,
@@ -168,7 +167,7 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
               console.log('InterviewPage: Saved interviews in localStorage:', JSON.parse(localStorage.getItem('candidateInterviews') || '[]'));
         setFeedback('Failed to score answer.');
             }).catch(err => {
-              console.error('InterviewPage: Error generating summary:', err);
+              console.error('InterviewPage: Error generating summary:', err as unknown);
               // Save interview without summary if summary fails
               const interviewData = {
                 id: `${candidate.email}-${Date.now()}`,
@@ -192,7 +191,7 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
           setCurrent(c => c + 1);
         }
       }, 2000);
-    } catch (err) {
+  } catch (err: unknown) {
       setFeedback('Failed to score answer.');
       console.error('Error evaluating answer:', err);
     } finally {

@@ -10,6 +10,8 @@ interface Question {
   answer: string;
   timeLimit: number;
   submitted: boolean;
+  score?: number;
+  feedback?: string;
 }
 
 interface InterviewState {
@@ -57,8 +59,30 @@ const interviewSlice = createSlice({
     resetInterview(state) {
       Object.assign(state, initialState);
     },
+    setAnswer(state, action: PayloadAction<{ answer: string; index: number }>) {
+      const { answer, index } = action.payload;
+      if (index >= 0 && index < state.questions.length) {
+        state.questions[index].answer = answer;
+      }
+    },
+    addScore(state, action: PayloadAction<{ score: number; feedback: string }>) {
+      const { score, feedback } = action.payload;
+      if (state.questions[state.currentQuestion]) {
+        state.questions[state.currentQuestion].score = score;
+        state.questions[state.currentQuestion].feedback = feedback;
+      }
+    },
+    nextQuestion(state) {
+      if (state.currentQuestion < state.questions.length - 1) {
+        state.currentQuestion += 1;
+      }
+    },
+    completeInterview(state) {
+      state.isPaused = true;
+      state.endTime = Date.now();
+    },
   },
 });
 
-export const { setQuestions, setCurrentQuestion, submitAnswer, setPaused, setStartTime, setEndTime, resetInterview } = interviewSlice.actions;
+export const { setQuestions, setCurrentQuestion, submitAnswer, setPaused, setStartTime, setEndTime, resetInterview, setAnswer, addScore, nextQuestion, completeInterview } = interviewSlice.actions;
 export default interviewSlice.reducer;
