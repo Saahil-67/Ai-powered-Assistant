@@ -1,26 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Node",
-    "jsx": "react-jsx",
-    "allowJs": true,
-    "noEmitOnError": false,
     "skipLibCheck": true,
-    "strict": false,
+    "noEmitOnError": false,
     "noImplicitAny": false,
-    "forceConsistentCasingInFileNames": false,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": false,
-    "emitDeclarationOnly": false,
-    "outDir": "./dist",               // <-- add output folder
-    "declaration": true               // generate .d.ts files
+    "strict": false,
+    "forceConsistentCasingInFileNames": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],   // be explicit
-  "exclude": ["node_modules", "dist"],
+  "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }

@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
-/* Keep this export if other parts of the app need the interview shape */
 export interface CandidateInterview {
   id: string;
   name: string;
@@ -17,12 +16,10 @@ export interface CandidateInterview {
     difficulty: string;
   }>;
   finalScore: number;
-  summary?: string;
   dateCompleted: string;
 }
 
-/* Make the slice state **private** – remove the export keyword */
-export interface CandidateHistoryState {
+interface CandidateHistoryState {
   interviews: CandidateInterview[];
 }
 
@@ -46,6 +43,5 @@ const candidateHistorySlice = createSlice({
   },
 });
 
-export const { addInterview, setInterviews, resetHistory } =
-  candidateHistorySlice.actions;
+export const { addInterview, setInterviews, resetHistory } = candidateHistorySlice.actions;
 export default candidateHistorySlice.reducer;

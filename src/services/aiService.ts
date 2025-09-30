@@ -1,4 +1,4 @@
-import type { InterviewQuestion, ScoringResponse, Difficulty } from '../types/interview';
+import type { InterviewQuestion, QuestionResponse, ScoringResponse, Difficulty } from '../types/interview';
 
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
 const HF_MODEL = import.meta.env.VITE_HF_MODEL;
@@ -53,7 +53,7 @@ interface ResumeContext {
 }
 
 interface AIResponse {
-  question?: InterviewQuestion;
+  question?: Question;
   error?: string;
 }
 

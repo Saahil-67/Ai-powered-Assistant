@@ -20,7 +20,6 @@ export interface InterviewQuestion {
   expectedDuration: number;
   sampleAnswer?: string;
   scoringCriteria?: string[];
-  timeLimit?: number;
 }
 
 export interface QuestionResponse {

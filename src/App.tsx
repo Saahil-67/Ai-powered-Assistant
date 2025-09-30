@@ -102,7 +102,12 @@ const App: React.FC = () => {
                   } : {})}
                 />
               ) : (
-                <ResumeUpload onStartInterview={() => setInterviewStarted(true)} />
+                <ResumeUpload onStartInterview={() => {
+                  setInterviewStarted(true);
+                  // Always clear incomplete interview when starting fresh
+                  localStorage.removeItem('incompleteInterview');
+                  setResumeData(null);
+                }} />
               )
             ) : (
               <InterviewerDashboard />

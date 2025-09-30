@@ -1,177 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import re
-import json
 import requests
+import re
 import pdfplumber
 from docx import Document
+import json
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://localhost:5173"])
+CORS(app, origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"])
 
-# --- Configure these environment variables or replace with your values ---
-GROQ_API_URL = os.environ.get("GROQ_API_URL", "https://api.openai.com/v1/chat/completions")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "replace_with_key")
-MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")  # adjust as needed
-# -----------------------------------------------------------------------
-
-def extract_text_from_pdf(file_path):
-    text_parts = []
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                text_parts.append(page.extract_text() or "")
-    except Exception:
-        pass
-    return "\n".join(text_parts).strip()
-
-def extract_text_from_docx(file_path):
-    text_parts = []
-    try:
-        doc = Document(file_path)
-        for p in doc.paragraphs:
-            text_parts.append(p.text)
-    except Exception:
-        pass
-    return "\n".join(text_parts).strip()
-
-def extract_basic_contact_info(text, filename=""):
-    # Email
-    email_match = re.search(r'[\w\.-]+@[\w\.-]+', text) if text else None
-    # Phone (simple)
-    phone_match = re.search(r'(\+?\d{1,3}[\s-]?)?($?\d{3}$?[\s-]?)?\d{3}[\s-]?\d{4}', text) if text else None
-
-    # Name: first non-empty line that doesn't contain email/phone and has at least two words
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    name = ""
-    for line in lines:
-        if email_match and email_match.group() in line:
-            continue
-        if phone_match and phone_match.group() in line:
-            continue
-        if len(line.split()) >= 2 and not re.search(r'\d', line):
-            name = line
-            break
-
-    extracted_info = {
-        "name": name or "",
-        "email": email_match.group(0) if email_match else "",
-        "phone": phone_match.group(0) if phone_match else ""
-    }
-    return extracted_info
-
-@app.route("/validate_resume", methods=["POST"])
-def validate_resume():
-    """
-    Accepts a file upload via 'file' (form-data).
-    Returns JSON describing extracted contact fields and whether resume is valid.
-    """
-    if "file" not in request.files:
-        return jsonify({"error": "No file part"}), 400
-
-    file = request.files["file"]
-    filename = file.filename or "uploaded_resume"
-    _, ext = os.path.splitext(filename.lower())
-
-    tmp_path = f"/tmp/{filename}"
-    try:
-        file.save(tmp_path)
-    except Exception as e:
-        return jsonify({"error": f"Could not save uploaded file: {e}"}), 500
-
-    text = ""
-    if ext in [".pdf"]:
-        text = extract_text_from_pdf(tmp_path)
-    elif ext in [".docx", ".doc"]:
-        text = extract_text_from_docx(tmp_path)
-    elif ext in [".txt"]:
-        try:
-            with open(tmp_path, "r", encoding="utf-8", errors="ignore") as f:
-                text = f.read()
-        except Exception:
-            text = ""
-    else:
-        # Try to treat unknown as text
-        try:
-            with open(tmp_path, "r", encoding="utf-8", errors="ignore") as f:
-                text = f.read()
-        except Exception:
-            text = ""
-
-    # Remove temp file
-    try:
-        os.remove(tmp_path)
-    except Exception:
-        pass
-
-    if not text:
-        return jsonify({
-            "is_valid_resume": False,
-            "reason": "Uploaded file could not be parsed or is empty",
-            "extracted_info": {"name": "", "email": "", "phone": ""},
-            "missing_fields": ["name", "email", "phone"],
-            "confidence": "low",
-            "resume": filename,
-            "raw_text": ""
-        }), 400
-
-    extracted_info = extract_basic_contact_info(text, filename)
-    required_fields = ["name", "email", "phone"]
-    missing_fields = [f for f in required_fields if not extracted_info.get(f)]
-
-    return jsonify({
-        "is_valid_resume": len(missing_fields) == 0,
-        "reason": "" if len(missing_fields) == 0 else "Missing required fields: " + ", ".join(missing_fields),
-        "extracted_info": extracted_info,
-        "missing_fields": missing_fields,
-        "confidence": "high" if len(missing_fields) == 0 else "medium",
-        "resume": filename,
-        "raw_text": text[:10000]  # limit raw text size returned
-    }), (200 if len(missing_fields) == 0 else 400)
-
-@app.route("/generate_question", methods=["POST"])
-def generate_question():
-    """
-    Expects JSON with keys: answersAndScores (list), difficulty (easy/medium/hard), context (optional)
-    Returns a generated interview question (JSON).
-    """
-    data = request.get_json() or {}
-    answers_and_scores = data.get("answersAndScores", [])
-    difficulty = data.get("difficulty", "medium")
-    context = data.get("context", "")
-
-    # Format answers for prompt
-    answers_str = "\n".join([
-        f"Q{i+1}: {item.get('question','')}\nA: {item.get('answer','')}\nScore: {item.get('score','')}"
-        for i, item in enumerate(answers_and_scores)
-    ])
-
+@app.route('/generate_summary', methods=['POST'])
+def generate_summary():
+    data = request.get_json()
+    answers_and_scores = data.get('answersAndScores', [])
+    # Compose Groq prompt for summary
     prompt = f"""
-You are conducting a technical interview for a Full Stack Developer position (React/Node.js).
-
-Candidate background:
-{context}
-
-Previous Q/As:
-{answers_str}
-
-Generate ONE {difficulty} level question that can be answered verbally in the time limit:
-- Easy (20 seconds): Simple concept explanation or definition
-- Medium (60 seconds): How-to or comparison question
-- Hard (120 seconds): Design approach or problem-solving strategy
-
-Return ONLY valid JSON (no comments):
-{{
-  "question": "single focused question here",
-  "category": "React/Node.js/Full Stack",
-  "difficulty": "{difficulty}",
-  "expected_duration": 20
-}}
-"""
-
+    Based on these 6 interview answers and scores, generate a 2-3 sentence summary of the candidate's overall performance, strengths, and areas for improvement. Format as plain text only.
+    Answers and scores:
+    {json.dumps(answers_and_scores, indent=2)}
+    """
     try:
-        resp = requests.post(
+        response = requests.post(
             GROQ_API_URL,
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -180,60 +30,264 @@ Return ONLY valid JSON (no comments):
             json={
                 "model": MODEL_NAME,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 300,
-                "temperature": 0.7
-            },
-            timeout=15
+                "max_tokens": 256,
+                "temperature": 0.5
+            }
         )
-        resp.raise_for_status()
-        groq_data = resp.json()
-        # Adapt to OpenAI-style response or generic
-        content = ""
-        if "choices" in groq_data and len(groq_data["choices"]) > 0:
-            choice = groq_data["choices"][0]
-            # Chat-style
-            if "message" in choice:
-                content = choice["message"].get("content", "")
-            else:
-                content = choice.get("text", "")
-        else:
-            content = groq_data.get("content", "")
+        groq_data = response.json()
+        content = groq_data["choices"][0]["message"]["content"]
+        # Return summary as plain text
+        return jsonify({"summary": content.strip()})
+    except Exception as e:
+        print("Error in /generate_summary:", e)
+        return jsonify({'error': str(e)}), 500
 
-        # Extract first JSON object in content
+@app.route('/validate_resume', methods=['POST'])
+def validate_resume():
+    if 'resume' not in request.files:
+        return jsonify({'error': 'No resume file uploaded'}), 400
+    resume_file = request.files['resume']
+    filename = resume_file.filename
+    text = ""
+    # Extract text from PDF
+    if filename.lower().endswith('.pdf'):
+        with pdfplumber.open(resume_file) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+    # Extract text from DOCX
+    elif filename.lower().endswith('.docx'):
+        doc = Document(resume_file)
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+    else:
+        return jsonify({'error': 'Unsupported file type'}), 400
+    # Compose Groq prompt for intelligent validation
+    prompt = f"""
+    Analyze this document and respond with JSON:
+    {{
+      'is_valid_resume': true/false,
+      'reason': 'explanation if invalid',
+      'extracted_info': {{
+        'name': 'found name or null',
+        'email': 'found email or null',
+        'phone': 'found phone or null'
+      }},
+      'missing_fields': ['list of missing required fields'],
+      'confidence': 'high/medium/low'
+    }}
+    Document:
+    {text}
+    """
+    try:
+        response = requests.post(
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": MODEL_NAME,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.3
+            }
+        )
+        groq_data = response.json()
+        content = groq_data["choices"][0]["message"]["content"]
+        # Try to extract JSON from Groq response
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
-            json_string = json_match.group(0)
-            json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
-            json_string = re.sub(r',([\s]*[}\]])', r'\1', json_string)
             try:
+                json_string = json_match.group(0)
+                # Remove JS-style comments and trailing commas
+                json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
+                json_string = re.sub(r',([\s]*[}}\]])', r'\1', json_string)
+                result = json.loads(json_string.replace("'", '"'))
+                return jsonify(result)
+            except Exception as e:
+                print("JSON decode error in /validate_resume:", e)
+                return jsonify({'error': 'AI response could not be parsed.'}), 500
+        return jsonify({'error': 'No valid AI response received.'}), 500
+    except Exception as e:
+        print("Error in /validate_resume:", e)
+        return jsonify({'error': str(e)}), 500
+@app.route('/test', methods=['GET'])
+def test():
+    return jsonify({'message': 'Flask is working'})
+
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
+if not GROQ_API_KEY or GROQ_API_KEY == "YOUR_GROQ_API_KEY":
+    raise RuntimeError("GROQ_API_KEY environment variable not set or contains invalid value. Please set it with your actual Groq API key.")
+print(f"Groq API key loaded: {GROQ_API_KEY[:10]}... (set via env, stripped)")
+MODEL_NAME = "llama-3.1-8b-instant"
+
+@app.route('/extract_resume', methods=['POST'])
+def extract_resume():
+    import re
+    import pdfplumber
+    from docx import Document
+    if 'resume' not in request.files:
+        return jsonify({'error': 'No resume file uploaded'}), 400
+    resume_file = request.files['resume']
+    filename = resume_file.filename
+    text = ""
+    # Extract text from PDF
+    if filename.lower().endswith('.pdf'):
+        with pdfplumber.open(resume_file) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+    # Extract text from DOCX
+    elif filename.lower().endswith('.docx'):
+        doc = Document(resume_file)
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+    else:
+        return jsonify({'error': 'Unsupported file type'}), 400
+    # Robust resume validation
+    required_keywords = [
+        'name', 'email', 'phone', 'experience', 'skills', 'education', 'work', 'project', 'summary', 'profile', 'certification', 'degree', 'university', 'college', 'employment', 'responsibility', 'achievement', 'internship', 'company', 'role', 'position'
+    ]
+    found_keywords = [kw for kw in required_keywords if re.search(rf'\b{kw}\b', text, re.IGNORECASE)]
+    # Structure pattern: look for sections like Experience, Education, Skills, Projects
+    section_patterns = [r'Experience', r'Education', r'Skills?', r'Projects?', r'Summary', r'Profile']
+    found_sections = [pat for pat in section_patterns if re.search(rf'\b{pat}\b', text, re.IGNORECASE)]
+    # Basic length check
+    if not text or len(text.strip()) < 100:
+        return jsonify({'error': 'Resume document is too short or empty. Please upload a valid resume.'}), 400
+    # Require at least 3 sections and 5 keywords
+    if len(found_sections) < 3 or len(found_keywords) < 5:
+        return jsonify({'error': 'Resume document does not appear to be a valid resume. Please upload a document with sections like Experience, Education, Skills, and typical resume keywords.'}), 400
+    # Regex extraction
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+', text)
+    phone_match = re.search(r'(\+?\d{1,2}[\s-]?)?(\(?\d{3}\)?[\s-]?)?\d{3}[\s-]?\d{4}', text)
+    # Name extraction: naive, first non-empty line not containing email/phone
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    name = ""
+    for l in lines:
+        if (email_match and email_match.group() in l) or (phone_match and phone_match.group() in l):
+            continue
+        if len(l.split()) >= 2 and not re.search(r'\d', l):
+            name = l
+            break
+    # Return full extracted text for downstream use
+    return jsonify({
+        'name': name or 'Unknown',
+        'email': email_match.group() if email_match else 'Unknown',
+        'phone': phone_match.group() if phone_match else 'Unknown',
+        'resume': filename,
+        'raw_text': text  # Pass full text for question generation
+    })
+
+@app.route('/generate_question', methods=['POST'])
+def generate_question():
+    data = request.get_json()
+    # Accept either resume filename or full extracted text
+    resume_text = data.get('resume', '')
+    # If resume_text is a dict (from frontend), get raw_text
+    if isinstance(resume_text, dict) and 'raw_text' in resume_text:
+        resume_text = resume_text['raw_text']
+    difficulty = data.get('difficulty', 'medium')
+    # If resume_text looks like a filename, try to get the extracted text from the candidate info
+    # Otherwise, use the raw text directly
+    if os.path.exists(resume_text):
+        with open(resume_text, 'r') as f:
+            resume_text = f.read()
+    pythonprompt = f"""
+You are conducting a technical interview for a Full Stack Developer position (React/Node.js).
+
+Generate ONE {difficulty} level question that can be answered verbally in the time limit:
+- Easy (20 seconds): Simple concept explanation or definition
+- Medium (60 seconds): How-to or comparison question  
+- Hard (120 seconds): Design approach or problem-solving strategy
+
+DIFFICULTY GUIDELINES:
+Easy examples: "What is JSX in React?", "Explain what npm is", "What's the difference between let and const?"
+Medium examples: "How would you handle form validation in React?", "Explain REST API best practices"
+Hard examples: "How would you architect a scalable authentication system?", "Explain React performance optimization strategies"
+
+IMPORTANT: 
+- Keep questions SHORT and FOCUSED on ONE topic
+- Questions should be ANSWERABLE in the time limit
+- Do NOT ask for code implementation or multiple steps
+- Do NOT ask for "code snippets" or "create/build" anything
+- Focus on EXPLAINING concepts, approaches, or strategies
+
+Return ONLY valid JSON (no comments):
+{{
+    "question": "single focused question here",
+    "category": "React/Node.js/Full Stack",
+    "difficulty": "{difficulty}",
+    "expected_duration": {180 if difficulty == 'easy' else 300 if difficulty == 'medium' else 600}
+}}
+"""
+    prompt = pythonprompt
+    import re
+    import json
+    try:
+        response = requests.post(
+            GROQ_API_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": MODEL_NAME,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.7
+            }
+        )
+        groq_data = response.json()
+        content = groq_data["choices"][0]["message"]["content"]
+        print("Raw Groq response:", content)
+        # Try to extract JSON only (ignore markdown, extra text)
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            try:
+                json_string = json_match.group(0)
+                # Remove JavaScript-style comments
+                json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
+                # Remove trailing commas before closing braces/brackets
+                json_string = re.sub(r',([\s]*[}}\]])', r'\1', json_string)
                 question_data = json.loads(json_string)
                 return jsonify(question_data)
-            except Exception:
-                pass
-
-        # Fallback: attempt to parse as JSON directly
+            except json.JSONDecodeError as e:
+                print("JSONDecodeError:", e)
+                # Fallback: return default question
+                return jsonify({"question": "What is Python and how is it used in Machine Learning?", "difficulty": difficulty})
+        # Fallback: try to parse any JSON in the content
         try:
-            return jsonify(json.loads(content))
-        except Exception:
-            # Final fallback: return content as question text
-            return jsonify({"question": content.strip(), "difficulty": difficulty})
+            question_data = json.loads(content)
+            return jsonify(question_data)
+        except Exception as e:
+            print("Fallback JSON parse error:", e)
+        # If all else fails, return raw content
+        return jsonify({"question": content.strip(), "difficulty": difficulty})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("General error in /generate_question:", e)
+        return jsonify({'error': str(e)}), 500
 
-@app.route("/evaluate_answer", methods=["POST"])
+@app.route('/evaluate_answer', methods=['POST'])
 def evaluate_answer():
-    """
-    Expects JSON with: question, answer, difficulty
-    Returns: {"score": int, "feedback": "short text"}
-    """
-    data = request.get_json() or {}
-    question = data.get("question", "")
-    answer = data.get("answer", "")
-    difficulty = data.get("difficulty", "medium")
-
+    data = request.json if request.json else request.get_json()
+    question = data.get('question')
+    answer = data.get('answer')
+    difficulty = data.get('difficulty')
+    # If answer is blank, return score 0 and feedback immediately
     if not answer or str(answer).strip() == "":
-        return jsonify({"score": 0, "feedback": "No answer provided"}), 200
-
+        print("Blank answer detected. Returning score 0 and feedback without Groq call.")
+        return jsonify({"score": 0, "feedback": "No answer provided"})
+    print("=" * 50)
+    print("EVALUATE_ANSWER ENDPOINT CALLED")
+    data = request.json if request.json else request.get_json()
+    print(f"Received data: {data}")
+    question = data.get('question')
+    answer = data.get('answer')
+    difficulty = data.get('difficulty')
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+    print(f"Difficulty: {difficulty}")
     prompt = f"""
 You are an expert technical interviewer. Score this answer strictly:
 
@@ -244,13 +298,14 @@ Scoring rules:
 - Only give a score of 8-10 for truly excellent, complete, and correct answers.
 - Give 4-7 for partial, incomplete, or somewhat correct answers.
 - Give 0-3 for mostly incorrect, missing, or irrelevant answers.
+- Be realistic and do not give high scores for partial or vague answers.
 
 Return ONLY this JSON (keep feedback under 100 words):
-{{"score": 0, "feedback": "brief feedback"}}
+{{"score": 0-10, "feedback": "brief feedback"}}
 """
-
     try:
-        resp = requests.post(
+        print("Calling Groq API...")
+        response = requests.post(
             GROQ_API_URL,
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -259,107 +314,57 @@ Return ONLY this JSON (keep feedback under 100 words):
             json={
                 "model": MODEL_NAME,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 160,
+                "max_tokens": 256,
                 "temperature": 0.1
-            },
-            timeout=12
+            }
         )
-        resp.raise_for_status()
-        groq_data = resp.json()
-
-        content = ""
-        if "choices" in groq_data and len(groq_data["choices"]) > 0:
-            choice = groq_data["choices"][0]
-            if "message" in choice:
-                content = choice["message"].get("content", "")
-            else:
-                content = choice.get("text", "")
-        else:
-            content = groq_data.get("content", "")
-
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            json_string = json_match.group(0)
-            json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
-            json_string = re.sub(r',([\s]*[}\]])', r'\1', json_string)
-            try:
-                result = json.loads(json_string)
-                score = int(result.get("score", 0))
-                feedback = result.get("feedback", "No feedback provided")
-                return jsonify({"score": score, "feedback": feedback}), 200
-            except Exception:
-                pass
-
-        # Fallback: try parsing content directly
+        print(f"Groq raw response: {response}")
+        groq_data = response.json()
+        print(f"Groq message content: {groq_data}")
+        finish_reason = groq_data["choices"][0].get("finish_reason")
+        if finish_reason == 'length':
+            print("Groq response was truncated. Returning default score for blank answer.")
+            return jsonify({"score": 0, "feedback": "No answer provided"})
+        # Try to extract score and feedback
+        score = 0
+        feedback = "Unable to evaluate"
         try:
-            result = json.loads(content)
-            score = int(result.get("score", 0))
-            feedback = result.get("feedback", "No feedback provided")
-            return jsonify({"score": score, "feedback": feedback}), 200
-        except Exception:
-            # last resort
-            return jsonify({"score": 0, "feedback": content.strip()[:200]}), 200
+            content = groq_data["choices"][0]["message"]["content"]
+            import re, json
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                json_string = json_match.group(0)
+                json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
+                json_string = re.sub(r',([\s]*[}}\]])', r'\1', json_string)
+                result = json.loads(json_string)
+                score = result.get('score', 0)
+                feedback = result.get('feedback', 'Unable to evaluate')
+        except Exception as e:
+            print(f"Error extracting score/feedback: {e}")
+            score = 0
+            feedback = "Evaluation error"
+        print(f"EXTRACTED SCORE: {score}")
+        print(f"EXTRACTED FEEDBACK: {feedback}")
+        print(f"RETURNING TO FRONTEND: {{'score': {score}, 'feedback': {feedback}}}")
+        print("=" * 50)
+        return jsonify({"score": score, "feedback": feedback})
     except Exception as e:
+        print(f"ERROR IN EVALUATION: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@app.route("/generate_summary", methods=["POST"])
-def generate_summary():
-    """
-    Example endpoint to summarize answers_and_scores or resume context.
-    Accepts JSON: { answersAndScores: [...], context: "..." }
-    """
-    data = request.get_json() or {}
-    answers_and_scores = data.get("answersAndScores", [])
-    context = data.get("context", "")
+@app.route('/get_candidate', methods=['GET'])
+def get_candidate():
+    # Dummy candidate data (replace with real DB lookup if needed)
+    return jsonify({
+        'name': 'John Doe',
+        'email': 'john@example.com',
+        'phone': '123-456-7890',
+        'resume': 'resume.pdf',
+        'interview_progress': 'incomplete'
+    })
 
-    answers_str = "\n".join([
-        f"Q{i+1}: {item.get('question','')}\nA: {item.get('answer','')}\nScore: {item.get('score','')}"
-        for i, item in enumerate(answers_and_scores)
-    ])
-
-    prompt = f"Summarize candidate background and performance.\n\nContext:\n{context}\n\nQ/As:\n{answers_str}\n\nReturn JSON: {{'summary':'short summary'}}"
-
-    try:
-        resp = requests.post(
-            GROQ_API_URL,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": MODEL_NAME,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 300,
-                "temperature": 0.3
-            },
-            timeout=12
-        )
-        resp.raise_for_status()
-        groq_data = resp.json()
-        content = ""
-        if "choices" in groq_data and len(groq_data["choices"]) > 0:
-            choice = groq_data["choices"][0]
-            if "message" in choice:
-                content = choice["message"].get("content", "")
-            else:
-                content = choice.get("text", "")
-        else:
-            content = groq_data.get("content", "")
-
-        # Attempt to extract JSON
-        json_match = re.search(r'\{[\s\S]*\}', content)
-        if json_match:
-            json_string = json_match.group(0)
-            json_string = re.sub(r'//.*?(?=\n|$)', '', json_string)
-            json_string = re.sub(r',([\s]*[}\]])', r'\1', json_string)
-            try:
-                return jsonify(json.loads(json_string))
-            except Exception:
-                pass
-
-        return jsonify({"summary": content.strip()})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(port=5001, debug=True)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=True)

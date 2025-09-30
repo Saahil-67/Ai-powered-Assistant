@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { generateQuestion } from '../services/aiService';
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { generateQuestion } from '../services/api';
 
 const ApiTest: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -12,7 +13,7 @@ const ApiTest: React.FC = () => {
     setResult(null);
     try {
       // Dummy resume and difficulty
-  const resp = await generateQuestion('easy', { skills: ['React', 'Node.js', 'AWS'], experience: [], education: [], projects: [] }, 0);
+      const resp = await generateQuestion('React, Node.js, AWS', 'easy');
       setResult(resp);
     } catch (err: any) {
       setError(err?.message || 'API call failed');
