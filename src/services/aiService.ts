@@ -1,5 +1,5 @@
 import type { InterviewQuestion, QuestionResponse, ScoringResponse, Difficulty } from '../types/interview';
-import { getQuestionByDifficulty, mockQuestions } from '../data/mockQuestions';
+// Removed unused mockQuestions and getQuestionByDifficulty imports
 
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
 const HF_MODEL = import.meta.env.VITE_HF_MODEL;
