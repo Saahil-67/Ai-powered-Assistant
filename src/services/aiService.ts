@@ -1,5 +1,4 @@
 import type { InterviewQuestion, QuestionResponse, ScoringResponse, Difficulty } from '../types/interview';
-import { getQuestionByDifficulty, mockQuestions } from '../data/mockQuestions';
 
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
 const HF_MODEL = import.meta.env.VITE_HF_MODEL;
@@ -17,41 +16,6 @@ interface HFResponse {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const generatePrompt = (difficulty: Difficulty, questionNumber: number): string => {
-  return `Generate a technical React.js interview question with the following requirements:
-  - Difficulty level: ${difficulty}
-  - Question number: ${questionNumber} of 6
-  - Focus areas: React hooks, state management, performance optimization, or API integration
-  - Include a specific scenario or problem to solve
-  - The question should require practical implementation knowledge
-  
-  Format the response as a JSON object with:
-  {
-    "text": "the question text",
-    "category": "the main topic category",
-    "expectedDuration": time in seconds,
-    "scoringCriteria": ["criterion1", "criterion2", "criterion3"]
-  }`;
-};
-
-const parseHFResponse = (response: string): Partial<InterviewQuestion> => {
-  try {
-    // Find the JSON object in the response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found in response');
-    
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      text: parsed.text,
-      category: parsed.category,
-      expectedDuration: parsed.expectedDuration,
-      scoringCriteria: parsed.scoringCriteria
-    };
-  } catch (error) {
-    console.error('Failed to parse HF response:', error);
-    return {};
-  }
-};
 
 async function makeHFRequest(prompt: string, retries = MAX_RETRIES): Promise<HFResponse> {
   try {
@@ -79,7 +43,7 @@ async function makeHFRequest(prompt: string, retries = MAX_RETRIES): Promise<HFR
   }
 }
 
-import { Question, Difficulty } from '../types/interview';
+// ...existing code...
 
 interface ResumeContext {
   skills: string[];
@@ -187,78 +151,6 @@ export const generateQuestion = async (
   }
 };
 
-export const scoreAnswer = async (
-  params: {
-    question: Question;
-    answer: string;
-    timeSpent: number;
-    expectedDuration: number;
-  }
-): Promise<{ score: number; feedback: string } | { error: string }> => {
-  if (!HUGGING_FACE_TOKEN) {
-    return { error: 'API token not configured' };
-  }
-
-  const { question, answer, timeSpent, expectedDuration } = params;
-
-  const prompt = `
-    You are an expert technical interviewer. Score this answer:
-
-    Question: ${question.text}
-    Category: ${question.category}
-    Difficulty: ${question.difficulty}
-    Answer: ${answer}
-    Time Spent: ${timeSpent} seconds (Expected: ${expectedDuration} seconds)
-
-    Scoring Criteria:
-    ${question.scoringCriteria?.join('\n')}
-
-    Provide a JSON response with:
-    {
-      "score": (number between 0-100),
-      "feedback": "detailed feedback explaining the score"
-    }
-  `;
-
-  try {
-    const response = await fetch(MODEL_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${HUGGING_FACE_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          max_length: 500,
-          temperature: 0.3,
-        }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to score answer');
-    }
-
-    const data = await response.json();
-    const parsedResponse = JSON.parse(data[0].generated_text);
-
-    return {
-      score: parsedResponse.score,
-      feedback: parsedResponse.feedback
-    };
-  } catch (error) {
-    console.error('Scoring error:', error);
-    // Fallback scoring based on completion and time
-    const timeScore = Math.max(0, 100 - (Math.abs(timeSpent - expectedDuration) / expectedDuration) * 50);
-    const completionScore = answer.length > 50 ? 70 : 30;
-    
-    return {
-      score: Math.round((timeScore + completionScore) / 2),
-      feedback: 'Score generated based on answer length and timing due to AI service error.'
-    };
-  }
-};
 
 export async function scoreAnswer(
   question: InterviewQuestion,
