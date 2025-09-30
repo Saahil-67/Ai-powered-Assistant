@@ -17,7 +17,6 @@ const InterviewerDashboard: React.FC = () => {
   console.log('InterviewerDashboard Redux candidateHistory:', interviews);
   console.log('InterviewerDashboard localStorage candidateInterviews:', JSON.parse(localStorage.getItem('candidateInterviews') || '[]'));
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
-  const username = useSelector((state: RootState) => state.auth.username);
   const dispatch = useDispatch();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('date');

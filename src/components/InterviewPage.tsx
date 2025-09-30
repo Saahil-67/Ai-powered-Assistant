@@ -61,16 +61,16 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
       console.log('Timer started at:', Date.now());
       try {
         const result = await generateQuestion({ raw_text: candidate.raw_text }, difficulty);
-        setQuestions(qs => {
-          const newQs = [...qs];
+        setQuestions(prevQs => {
+          const newQs = [...prevQs];
           newQs[current] = result;
           return newQs;
         });
         setTimer(timerDuration);
         setAnswer('');
-      } catch (err) {
-        setQuestions(qs => {
-          const newQs = [...qs];
+      } catch (err: unknown) {
+        setQuestions(prevQs => {
+          const newQs = [...prevQs];
           newQs[current] = { question: 'Failed to generate question.' };
           return newQs;
         });
@@ -78,7 +78,7 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
         setLoading(false);
       }
     };
-    if (current < DIFFICULTY_ORDER.length && !questions[current]) fetchQuestion();
+    if (typeof current === 'number' && current < DIFFICULTY_ORDER.length && !questions[current]) fetchQuestion();
     // eslint-disable-next-line
   }, [current]);
 
@@ -166,7 +166,7 @@ const InterviewPage: React.FC<InterviewPageProps> = ({ onComplete, initialQuesti
               const prev = JSON.parse(localStorage.getItem('candidateInterviews') || '[]');
               localStorage.setItem('candidateInterviews', JSON.stringify([...prev, interviewData]));
               console.log('InterviewPage: Saved interviews in localStorage:', JSON.parse(localStorage.getItem('candidateInterviews') || '[]'));
-              if (onComplete) onComplete();
+        setFeedback('Failed to score answer.');
             }).catch(err => {
               console.error('InterviewPage: Error generating summary:', err);
               // Save interview without summary if summary fails

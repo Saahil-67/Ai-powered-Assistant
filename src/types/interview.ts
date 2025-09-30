@@ -1,3 +1,15 @@
+export interface CandidateInterview {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  resume: string;
+  raw_text: string;
+  questions: InterviewQuestion[];
+  finalScore: number;
+  summary?: string;
+  dateCompleted: string;
+}
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface InterviewQuestion {

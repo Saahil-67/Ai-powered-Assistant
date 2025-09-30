@@ -8,9 +8,10 @@ import { useNavigate } from 'react-router-dom';
 
 type ResumeUploadProps = {
   onStartInterview?: () => void;
+  onUpload?: () => void;
 };
 
-const ResumeUpload: React.FC<ResumeUploadProps> = ({ onStartInterview }) => {
+const ResumeUpload: React.FC<ResumeUploadProps> = ({ onStartInterview, onUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
