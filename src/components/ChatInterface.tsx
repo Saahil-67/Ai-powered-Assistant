@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../redux/store';
-import { generateQuestion, evaluateAnswer } from '../services/api';
+import { generateQuestion, scoreAnswer } from '../services/aiService';
 import { 
   startLoading,
   setError,
@@ -31,8 +31,18 @@ const ChatInterface: React.FC = () => {
         dispatch(startLoading());
         try {
           const difficulty = DIFFICULTY_ORDER[currentQuestion];
-          const resumeData = candidate.resume || '';
-          const result = await generateQuestion(resumeData, difficulty);
+          // Map candidate state to ResumeContext
+          const resumeContext = {
+            skills: candidate.skills || [],
+            experience: candidate.experience || [],
+            education: candidate.education || [],
+            projects: candidate.projects || []
+          };
+          const result = await generateQuestion(
+            difficulty as import('../types/interview').Difficulty,
+            resumeContext,
+            currentQuestion
+          );
           if (result?.question) {
             dispatch(addQuestion(result.question));
             setTimer(DIFFICULTY_TIME[difficulty]);
@@ -75,17 +85,18 @@ const ChatInterface: React.FC = () => {
     dispatch(startLoading());
     try {
       dispatch(setAnswer({ answer, index: currentQuestion }));
-      const result = await evaluateAnswer(questions[currentQuestion].text, answer);
-      if (result?.score !== undefined) {
-        dispatch(addScore({
-          score: result.score,
-          feedback: result.feedback || '',
-          strengths: [],
-          improvements: [],
-          technicalAccuracy: 0,
-          communicationClarity: 0,
-          completeness: 0
-        }));
+      const currentQ = questions[currentQuestion];
+      const result = await scoreAnswer(
+        {
+          ...currentQ,
+          category: currentQ.category || '',
+          expectedDuration: currentQ.expectedDuration || DIFFICULTY_TIME[DIFFICULTY_ORDER[currentQuestion]],
+        },
+        answer,
+        DIFFICULTY_TIME[DIFFICULTY_ORDER[currentQuestion]] - timer
+      );
+      if (result?.score) {
+        dispatch(addScore(result.score));
       } else {
         dispatch(setError(result?.error || 'Failed to score answer.'));
       }

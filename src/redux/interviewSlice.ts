@@ -7,6 +7,9 @@ interface Question {
   id: string;
   text: string;
   difficulty: Difficulty;
+  category: string;
+  expectedDuration: number;
+  scoringCriteria?: string[];
   answer: string;
   timeLimit: number;
   submitted: boolean;
@@ -20,6 +23,9 @@ interface InterviewState {
   isPaused: boolean;
   startTime: number | null;
   endTime: number | null;
+  loading: boolean;
+  error: string | null;
+  completed: boolean;
 }
 
 const initialState: InterviewState = {
@@ -28,6 +34,9 @@ const initialState: InterviewState = {
   isPaused: false,
   startTime: null,
   endTime: null,
+  loading: false,
+  error: null,
+  completed: false,
 };
 
 const interviewSlice = createSlice({
@@ -46,6 +55,22 @@ const interviewSlice = createSlice({
         state.questions[index].answer = answer;
         state.questions[index].submitted = true;
       }
+    },
+    startLoading(state) {
+      state.loading = true;
+      state.error = null;
+    },
+    setError(state, action: PayloadAction<string>) {
+      state.loading = false;
+      state.error = action.payload;
+    },
+    addQuestion(state, action: PayloadAction<Question>) {
+      state.questions.push({
+        ...action.payload,
+        answer: '',
+        submitted: false
+      });
+      state.loading = false;
     },
     setPaused(state, action: PayloadAction<boolean>) {
       state.isPaused = action.payload;
@@ -84,5 +109,5 @@ const interviewSlice = createSlice({
   },
 });
 
-export const { setQuestions, setCurrentQuestion, submitAnswer, setPaused, setStartTime, setEndTime, resetInterview, setAnswer, addScore, nextQuestion, completeInterview } = interviewSlice.actions;
+export const { setQuestions, setCurrentQuestion, submitAnswer, setPaused, setStartTime, setEndTime, resetInterview, setAnswer, addScore, nextQuestion, completeInterview, startLoading, setError, addQuestion } = interviewSlice.actions;
 export default interviewSlice.reducer;

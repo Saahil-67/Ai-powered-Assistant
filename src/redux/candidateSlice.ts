@@ -10,6 +10,10 @@ interface CandidateState {
   score: number;
   summary: string;
   chatHistory: Array<{ role: string; message: string }>;
+  skills: string[];
+  experience: string[];
+  education: string[];
+  projects: string[];
 }
 
 const initialState: CandidateState = {
@@ -21,6 +25,10 @@ const initialState: CandidateState = {
   score: 0,
   summary: '',
   chatHistory: [],
+  skills: [],
+  experience: [],
+  education: [],
+  projects: [],
 };
 
 const candidateSlice = createSlice({

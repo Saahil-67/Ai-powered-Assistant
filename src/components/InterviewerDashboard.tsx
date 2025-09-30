@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../redux/store';
+import type { CandidateInterview } from '../types/interview';
 import Login from './Login';
 import { logout, setAuthState } from '../redux/authSlice';
 import { setInterviews } from '../redux/candidateHistorySlice';
@@ -50,7 +51,7 @@ const InterviewerDashboard: React.FC = () => {
   };
 
   const data = useMemo(() => {
-    let data = interviews;
+  let data: CandidateInterview[] = interviews;
     if (search) {
       data = data.filter(interview => interview.name.toLowerCase().includes(search.toLowerCase()));
     }
@@ -164,7 +165,7 @@ const InterviewerDashboard: React.FC = () => {
               <div className="mb-2 text-gray-700">Phone: {selectedInterview.phone}</div>
               <div className="mb-4 text-gray-600">Completed: {new Date(selectedInterview.dateCompleted).toLocaleString()}</div>
               <div className="mb-4 text-lg font-semibold">Final Score: <span className="text-green-600">{selectedInterview.finalScore}</span></div>
-              {selectedInterview.summary && (
+              {selectedInterview?.summary && (
                 <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <h4 className="font-bold mb-2 text-blue-700">AI Performance Summary</h4>
                   <div className="text-gray-800">{selectedInterview.summary}</div>
@@ -176,10 +177,14 @@ const InterviewerDashboard: React.FC = () => {
                   {selectedInterview.questions.map((q, idx) => (
                     <div key={idx} className="border rounded-lg p-4 bg-gray-50">
                       <div className="mb-2 text-sm text-gray-500">Q{idx + 1} ({q.difficulty.toUpperCase()})</div>
-                      <div className="font-semibold mb-2 text-blue-800">{q.question}</div>
-                      <div className="mb-2"><span className="font-bold">Answer:</span> {q.answer}</div>
-                      <div className="mb-2"><span className="font-bold">Score:</span> <span className="text-green-700">{q.score}</span></div>
-                      {q.feedback && (
+                      <div className="font-semibold mb-2 text-blue-800">{q.text}</div>
+                      {q.answer && (
+                        <div className="mb-2"><span className="font-bold">Answer:</span> {q.answer}</div>
+                      )}
+                      {'score' in q && q.score !== undefined && (
+                        <div className="mb-2"><span className="font-bold">Score:</span> <span className="text-green-700">{q.score}</span></div>
+                      )}
+                      {'feedback' in q && q.feedback && (
                         <div className="mb-2"><span className="font-bold">AI Feedback:</span> {q.feedback}</div>
                       )}
                     </div>
