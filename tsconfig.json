@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "noImplicitAny": false,
+    "strict": false,
+    "forceConsistentCasingInFileNames": false
   },
   "files": [],
   "references": [
