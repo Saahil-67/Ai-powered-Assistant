@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import { generateQuestion } from '../services/api';
 
 const ApiTest: React.FC = () => {

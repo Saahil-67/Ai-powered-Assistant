@@ -20,9 +20,6 @@ export interface InterviewQuestion {
   expectedDuration: number;
   sampleAnswer?: string;
   scoringCriteria?: string[];
-  answer?: string;
-  score?: number;
-  feedback?: string;
 }
 
 export interface QuestionResponse {

@@ -1,8 +1,23 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { CandidateInterview } from '../types/interview';
 
-// CandidateInterview type is now imported from types/interview.ts
+export interface CandidateInterview {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  resume: string;
+  raw_text: string;
+  questions: Array<{
+    question: string;
+    answer: string;
+    score: number;
+    feedback?: string;
+    difficulty: string;
+  }>;
+  finalScore: number;
+  dateCompleted: string;
+}
 
 interface CandidateHistoryState {
   interviews: CandidateInterview[];
