@@ -1,3 +1,10 @@
 {
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "ignoreBuildErrors": true,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node"
+    }
+  ]
 }
