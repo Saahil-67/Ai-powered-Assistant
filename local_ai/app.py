@@ -8,7 +8,11 @@ from docx import Document
 import json
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"])
+CORS(app, origins=[
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "https://ai-powered-assistant-bupz-46ejeoknd-saahil-manglanis-projects.vercel.app"
+])
 
 @app.route('/generate_summary', methods=['POST'])
 def generate_summary():
