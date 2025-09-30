@@ -1,0 +1,68 @@
+import React, { useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { login } from '../redux/authSlice';
+
+const DEMO_USER = 'admin';
+const DEMO_PASS = 'password';
+
+const Login: React.FC<{ onSuccess?: () => void }> = ({ onSuccess }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const dispatch = useDispatch();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username === DEMO_USER && password === DEMO_PASS) {
+      dispatch(login(username));
+      localStorage.setItem('interviewerAuth', JSON.stringify({ isAuthenticated: true, username }));
+      setError('');
+      if (onSuccess) onSuccess();
+    } else {
+      setError('Invalid credentials.');
+    }
+  };
+
+  return (
+    <div className="min-h-[400px] flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md mx-auto bg-white/80 backdrop-blur rounded-xl p-8 shadow-xl">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Interviewer Login</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-gray-700 font-semibold mb-2">Username</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700 font-semibold mb-2">Password</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          {error && <div className="text-red-600 text-center font-medium">{error}</div>}
+          <button
+            type="submit"
+            className="w-full py-3 bg-blue-500 text-white rounded-lg font-semibold shadow-lg hover:bg-blue-600 transition"
+          >
+            Login
+          </button>
+        </form>
+        <div className="mt-6 text-sm text-center text-gray-500">
+          Demo credentials: <span className="font-mono">admin / password</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;

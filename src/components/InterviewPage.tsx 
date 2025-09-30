@@ -1,0 +1,128 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import { generateQuestion, evaluateAnswer } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import type { RootState } from '../redux/store';
+
+const DIFFICULTY_ORDER = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard'];
+const DIFFICULTY_TIME = { easy: 20, medium: 60, hard: 120 };
+
+const InterviewPage: React.FC = () => {
+  const candidate = useSelector((state: RootState) => state.candidate);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [current, setCurrent] = useState(0);
+  const [answer, setAnswer] = useState('');
+  const [timer, setTimer] = useState(DIFFICULTY_TIME[DIFFICULTY_ORDER[0]]);
+  const [loading, setLoading] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchQuestion = async () => {
+      setLoading(true);
+      const difficulty = DIFFICULTY_ORDER[current];
+      try {
+        const result = await generateQuestion({ raw_text: candidate.raw_text }, difficulty);
+        setQuestions(qs => {
+          const newQs = [...qs];
+          newQs[current] = result;
+          return newQs;
+        });
+        setTimer(DIFFICULTY_TIME[difficulty]);
+        setAnswer('');
+      } catch (err) {
+        setQuestions(qs => {
+          const newQs = [...qs];
+          newQs[current] = { question: 'Failed to generate question.' };
+          return newQs;
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (!questions[current]) fetchQuestion();
+    // eslint-disable-next-line
+  }, [current]);
+
+  useEffect(() => {
+    if (questions[current] && !loading) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setTimer(prev => {
+          if (prev <= 1) {
+            handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    // eslint-disable-next-line
+  }, [questions, current, loading]);
+
+  const handleSubmit = async () => {
+    if (!questions[current] || loading) return;
+    setLoading(true);
+    try {
+      const result = await evaluateAnswer(questions[current].question, answer);
+      setScore(result.score);
+      setFeedback(result.feedback || '');
+      setTimeout(() => {
+        setScore(null);
+        setFeedback('');
+        if (current === 5) {
+          navigate('/'); // Or show results page
+        } else {
+          setCurrent(c => c + 1);
+        }
+      }, 2000);
+    } catch (err) {
+      setFeedback('Failed to score answer.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600 font-sans antialiased">
+      <div className="w-full max-w-xl bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl p-8">
+        <div className="mb-4 text-gray-700 text-lg font-semibold text-center">
+          Question {current + 1} / 6
+        </div>
+        <div className="mb-6 text-xl font-bold text-blue-700 text-center min-h-[60px]">
+          {questions[current]?.question || 'Loading...'}
+        </div>
+        <div className="flex items-center justify-center mb-4">
+          <span className="font-mono text-lg text-gray-600">Time: {timer}s</span>
+        </div>
+        <textarea
+          className="w-full min-h-[80px] border rounded-lg p-3 mb-4 text-gray-800"
+          value={answer}
+          onChange={e => setAnswer(e.target.value)}
+          disabled={loading || !!score}
+          placeholder="Type your answer here..."
+        />
+        <button
+          className="w-full py-3 bg-blue-500 text-white rounded-lg font-semibold shadow-lg mb-2"
+          onClick={handleSubmit}
+          disabled={loading || !!score}
+        >
+          {loading ? 'Submitting...' : 'Submit Answer'}
+        </button>
+        {score !== null && (
+          <div className="mt-4 text-center">
+            <div className="text-2xl font-bold text-green-600">Score: {score}</div>
+            <div className="text-gray-700 mt-2">{feedback}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default InterviewPage;
